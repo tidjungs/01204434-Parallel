@@ -16,15 +16,15 @@ int size;
 int rank;
 
 
-// void printMatrix() {
-//   for (int i = 0; i < n; i++) {
-//     for (int j = 0; j < n; j++) {
-//       printf("%llu ", m[i][j]);
-//     }
-//     printf("\n");
-//   }
-//   printf("=====================\n");
-// }
+void printMatrix() {
+  for (int i = 0; i < inputSize - 1; i++) {
+    for (int j = 0; j < inputSize - 1; j++) {
+      printf("%llu ", m[i][j]);
+    }
+    printf("\n");
+  }
+  printf("=====================\n");
+}
 
 void readInputData(char fileName[]) {
   char pathToFile[50];
@@ -34,15 +34,14 @@ void readInputData(char fileName[]) {
   fread(buf, 4, inputSize, file);
   for (int i = 0; i < inputSize; i++) {
     input[i] = buf[i];
-    printf("%llu\n", input[i]);
   }
 }
 
 void sendDataToSlave(int slaveCount) {
   for (int i = 1; i < slaveCount; i ++) {
-    int sendingSize = inputSize >> i;
-    int startIndex = inputSize - sendingSize;
-    MPI_Send(&input[startIndex], sendingSize, MPI_UNSIGNED_LONG_LONG	, i, 0, MPI_COMM_WORLD);
+    int startIndex = i*(inputSize-1)/size;
+    int dataSize = inputSize - startIndex;
+    MPI_Send(&input[startIndex], dataSize, MPI_UNSIGNED_LONG_LONG, i, 0, MPI_COMM_WORLD);
   }
 }
 
@@ -58,31 +57,53 @@ int main(int argc, char *argv[]) {
     readInputData(argv[1]);
     sendDataToSlave(size);
   } else {
-    int receiveSize = inputSize >> rank;
-    int startIndex = inputSize - receiveSize;
-    MPI_Recv(&input[startIndex], receiveSize, MPI_UNSIGNED_LONG_LONG	, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    for (int i=startIndex; i < startIndex + receiveSize; i++) {
-      printf("print from %d : %llu\n", rank, input[i]);
-    }
-    // printf("%d\n", a);
+    int startIndex = rank*(inputSize-1)/size;
+    int dataSize = inputSize - startIndex;
+    MPI_Recv(&input[startIndex], dataSize, MPI_UNSIGNED_LONG_LONG, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
-  // n = count - 1;
 
-  // for (int len=1; len<n; len++) {
-  //   for (int i=0; i<n-len; i++) {
-  //     int j = i + len;
-  //     m[i][j] = ULONG_MAX;
-  //     for (int k=i; k < j; k++) {
-  //       unsigned long long cost = m[i][k] + m[k+1][j] + input[i]*input[k+1]*input[j+1];
-  //       if (cost < m[i][j]) {
-  //         // printMatrix();
-  //          m[i][j] = cost;
-  //       }
-  //     }
-  //     // printf("===========\n");
-  //   }
-  // }
-  // printf("ans: %llu\n",m[0][n-1]);
+  int r = 1;
+  int n = inputSize - 1;
+  int gap = n / size;
+
+  for (int r=1; r<n; r++) {
+    int startIndex = rank*(inputSize-1)/size;
+    int endIndex = (rank+1)*(inputSize-1)/size;
+    for (int i=startIndex; i<endIndex; i++) {
+      int j = i+r;
+      if (j < n) {
+        m[i][j] = ULONG_MAX;
+        for (int k=i; k<j; k++) {
+          unsigned long long cost = m[i][k] + m[k+1][j] + input[i]*input[k+1]*input[j+1];
+          // printf("%d %d : %llu from %d\n", i, j, cost, rank);
+          if (cost < m[i][j]) {
+            m[i][j] = cost;
+          }
+        }
+      }
+
+      if (rank == 0) {
+        for (int k=1; k<=(size - rank - 1); k ++) {
+          MPI_Recv(&m[i+gap*k][j+gap*k], 1, MPI_UNSIGNED_LONG_LONG, rank+k, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+      } else if (rank == size - 1) {
+        for (int k=1; k<=rank; k++) {
+          MPI_Send(&m[i][j], 1, MPI_UNSIGNED_LONG_LONG, rank-k, 0, MPI_COMM_WORLD);
+        }
+      } else {
+        for (int k=1; k<=(size - rank - 1); k ++) {
+          MPI_Recv(&m[i+gap*k][j+gap*k], 1, MPI_UNSIGNED_LONG_LONG, rank+k, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+        for (int k=1; k<=rank; k++) {
+          MPI_Send(&m[i][j], 1, MPI_UNSIGNED_LONG_LONG, rank-k, 0, MPI_COMM_WORLD);
+        }
+      }
+    }
+  }
+
+  if (rank == 0) {
+    printf("ans: %llu\n",m[0][n-1]);
+  }
   MPI_Finalize();
   return 0;
 }

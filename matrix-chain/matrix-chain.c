@@ -18,6 +18,7 @@ int main(int argc, char *argv[]) {
 	fread(buf, 4, count, file);
 	for (int i = 0; i < count; i++) {
     input[i] = buf[i];
+    printf("%llu\n", input[i]);
 	}
   n = count - 1;
 
