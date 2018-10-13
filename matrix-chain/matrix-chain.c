@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <limits.h>
 
-unsigned long long m[2000][2000];
-int buf[2000];
-unsigned long long input[2000];
+unsigned long long m[2001][2001];
+int buf[2001];
+unsigned long long input[2001];
 int n;
 
 int main(int argc, char *argv[]) {
