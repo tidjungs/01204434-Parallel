@@ -2,6 +2,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
+
+float cal_euclidean_distance(int *p1, int *p2, int col) {
+  int sum_square = 0;
+  for (int i=0; i<col; i++) {
+    sum_square += pow(p1[i] - p2[i], 2);
+  }
+  return sqrt(sum_square);
+}
 
 int main(int argc, char *argv[]) {
   char filename[50];
@@ -60,9 +69,9 @@ int main(int argc, char *argv[]) {
       ct++;
     }
   }
-  for (int i=0; i<k; i++) {
-    printf("%d\n", centroidPositions[i]);
-  }
+  // for (int i=0; i<k; i++) {
+  //   printf("%d\n", centroidPositions[i]);
+  // }
 
   float **centroids = (float **)malloc(k * sizeof(float *));
   for (int i=0; i<k; i++)
@@ -73,13 +82,17 @@ int main(int argc, char *argv[]) {
       centroids[i][j] = data[centroidPositions[i]][j];
     }
   }
+  // for (int i=0; i<k; i++) {
+  //   for (int j=0; j<col; j++) {
+  //     printf("%f ", centroids[i][j]);
+  //   }
+  //   printf("\n");
+  // }
+  printf("%f\n", cal_euclidean_distance(data[0], data[1], col));
+  // for (int i=0; i<row; i++) {
 
- for (int i=0; i<k; i++) {
-    for (int j=0; j<col; j++) {
-      printf("%f ", centroids[i][j]);
-    }
-    printf("\n");
-  }
+  // }
+
   free(data);
   free(centroidPositions);
   free(centroids);
