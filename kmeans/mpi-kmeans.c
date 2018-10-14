@@ -8,15 +8,16 @@
 
 int num_clusters;
 int row, col, iter;
-int rank, size;
+int rank, size, num_per_proc;
 
-float **inputData;
+float **input_data;
 float **data;
+float **recv_data;
 
-void printCentroids(float **centroids) {
-  for (int i=0; i<num_clusters; i++) {
-    for (int j=0; j<col; j++) {
-      printf("%f ", centroids[i][j]);
+void print_array_2d(float **arr, int r, int c) {
+  for (int i=0; i<r; i++) {
+    for (int j=0; j<c; j++) {
+      printf("%f ", arr[i][j]);
     }
     printf("\n");
   }
@@ -39,15 +40,15 @@ int main(int argc, char *argv[]) {
   col = atoi(argv[3]);
   num_clusters = atoi(argv[4]);
   iter = atoi(argv[5]);
+  num_per_proc = row/size;
+  input_data = (float**)malloc(col * sizeof(float*));
 
   if (rank == 0) {
     char filename[50];
     sprintf(filename, "./%s", argv[1]);
 
-    // reading csv to array
-    inputData = (float**)malloc(col * sizeof(float*));
     for (int i=0; i<col; i++)
-      inputData[i] = (float*)malloc(row * sizeof(float));
+      input_data[i] = (float*)malloc(row * sizeof(float));
 
     char line[1024];
     int i = 0;
@@ -59,24 +60,37 @@ int main(int argc, char *argv[]) {
       int j = 0;
       while(pch != NULL)
       {
-        inputData[j][i] = atoi(pch);
+        input_data[j][i] = atoi(pch);
         pch = strtok(NULL, ",");
         j++;
       }
       i++;
     }
-    for (int i=0; i<col; i++) {
-      for (int j=0; j<row; j++) {
-        printf("%f ", inputData[i][j]);
-      }
-      printf("\n\n");
+    print_array_2d(input_data, col, row);
+  }
+  recv_data = (float**)malloc(col * sizeof(float*));
+  for (int i=0; i<col; i++)
+    recv_data[i] = (float*)malloc(num_per_proc * sizeof(float));
+
+  data = (float**)malloc(num_per_proc * sizeof(float*));
+  for (int i=0; i<num_per_proc; i++)
+    data[i] = (float*)malloc(col * sizeof(float));
+
+  for (int i=0; i<col; i++) {
+    MPI_Scatter(input_data[i], num_per_proc, MPI_FLOAT, recv_data[i], num_per_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
+  }
+  for(int i=0; i<num_per_proc; i++) {
+    for (int j=0; j<col; j++) {
+      data[i][j] = recv_data[j][i];
     }
   }
-  // data = (float**)malloc(25 * sizeof(float*));
-  //   for (int i=0; i<25; i++)
-  //     data[i] = (float*)malloc(col * sizeof(float));
-  // for (int i=0; i<col; i++) {
-  //   MPI_Scatter(inputData, 25, data, MPI_FLOAT, 0, MPI_COMM_WORLD);
+  free(input_data);
+  free(recv_data);
+
+  printf("rank %d\n", rank);
+  print_array_2d(data, num_per_proc, col);
+  // for (int i=0; i<row/size; i++) {
+  //   printf("rank %d get %f\n", rank, recv[i]);
   // }
   // for (int i=0; i<25; i++) {
   //   for (int j=0; j<col; j++)
@@ -170,7 +184,7 @@ int main(int argc, char *argv[]) {
 
   // // }
 
-  free(inputData);
+  free(data);
   // free(centroidPositions);
   // free(centroids);
   // free(group);
