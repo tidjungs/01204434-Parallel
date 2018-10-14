@@ -5,7 +5,19 @@
 #include <math.h>
 #include <limits.h>
 
-float cal_euclidean_distance(float *p1, float *p2, int col) {
+int num_clusters;
+int row, col;
+
+void printCentroids(float **centroids) {
+  for (int i=0; i<num_clusters; i++) {
+    for (int j=0; j<col; j++) {
+      printf("%f ", centroids[i][j]);
+    }
+    printf("\n");
+  }
+}
+
+float cal_euclidean_distance(float *p1, float *p2) {
   float sum_square = 0;
   for (int i=0; i<col; i++) {
     sum_square += pow(p1[i] - p2[i], 2);
@@ -17,14 +29,14 @@ int main(int argc, char *argv[]) {
   char filename[50];
   sprintf(filename, "./%s", argv[1]);
 
-  int row = atoi(argv[2]);
-  int col = atoi(argv[3]);
-  int k = atoi(argv[4]);
+  row = atoi(argv[2]);
+  col = atoi(argv[3]);
+  num_clusters = atoi(argv[4]);
 
   // reading csv to array
-  float **data = (float **)malloc(row * sizeof(float *));
+  float **data = (float**)malloc(row * sizeof(float*));
   for (int i=0; i<row; i++)
-    data[i] = (float *)malloc(col * sizeof(float));
+    data[i] = (float*)malloc(col * sizeof(float));
 
   char line[1024];
   int i = 0;
@@ -49,14 +61,14 @@ int main(int argc, char *argv[]) {
     printf("\n");
   }
 
-    // random k centroids with unique position
-  int *centroidPositions  = (int *)malloc(k * sizeof(int *));
-  for (int i=0; i<k; i++) {
+    // random centroids with unique position
+  int *centroidPositions  = (int*)malloc(num_clusters * sizeof(int));
+  for (int i=0; i<num_clusters; i++) {
     centroidPositions[i] = -1;
   }
   srand(time(NULL));
   int ct = 0;
-  while (ct < k) {
+  while (ct < num_clusters) {
     int r = rand() % row;
     int dup = 0;
     for (int i=0; i<=ct; i++) {
@@ -74,21 +86,16 @@ int main(int argc, char *argv[]) {
   //   printf("%d\n", centroidPositions[i]);
   // }
 
-  float **centroids = (float **)malloc(k * sizeof(float *));
-  for (int i=0; i<k; i++)
-    centroids[i] = (float *)malloc(col * sizeof(float));
+  float **centroids = (float**)malloc(num_clusters * sizeof(float*));
+  for (int i=0; i<num_clusters; i++)
+    centroids[i] = (float*)malloc(col * sizeof(float));
 
-  for (int i=0; i<k; i++) {
+  for (int i=0; i<num_clusters; i++) {
     for (int j=0; j<col; j++) {
       centroids[i][j] = data[centroidPositions[i]][j];
     }
   }
-  // for (int i=0; i<k; i++) {
-  //   for (int j=0; j<col; j++) {
-  //     printf("%f ", centroids[i][j]);
-  //   }
-  //   printf("\n");
-  // }
+  printCentroids(centroids);
 
   // create group array
   int *group = (int*)malloc(row * sizeof(int));
@@ -96,8 +103,8 @@ int main(int argc, char *argv[]) {
   for (int i=0; i<row; i++) {
     float distance = INT_MAX;
     int newGroup = -1;
-    for (int j=0; j<k; j++) {
-      float newDistance = cal_euclidean_distance(data[i], centroids[j], col);
+    for (int j=0; j<num_clusters; j++) {
+      float newDistance = cal_euclidean_distance(data[i], centroids[j]);
       if (newDistance < distance) {
         distance = newDistance;
         newGroup = j;
@@ -108,6 +115,32 @@ int main(int argc, char *argv[]) {
   for (int i=0; i<row; i++) {
     printf("%d\n", group[i]);
   }
+
+  // calculate new centroid
+  for (int i=0; i<num_clusters; i++) {
+    for (int j=0; j<col; j++) {
+      centroids[i][j] = 0;
+    }
+  }
+  for (int i=0; i<num_clusters; i++) {
+    int count = 0;
+    for (int j=0; j<row; j++) {
+      if (group[j] == i) {
+        for (int k=0; k<col; k++) {
+          centroids[i][k] += data[j][k];
+        }
+        count++;
+      }
+    }
+    printf("count %d\n", count);
+    for (int k=0; k<col; k++) {
+      centroids[i][k] /= count;
+    }
+  }
+
+  // printCentroids(centroids);
+
+
   // printf("%f\n", cal_euclidean_distance(data[0], data[1], col));
   // for (int i=0; i<row; i++) {
 
