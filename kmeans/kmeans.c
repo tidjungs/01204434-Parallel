@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
+#include <limits.h>
 
 float cal_euclidean_distance(float *p1, float *p2, int col) {
   float sum_square = 0;
@@ -88,7 +89,26 @@ int main(int argc, char *argv[]) {
   //   }
   //   printf("\n");
   // }
-  printf("%f\n", cal_euclidean_distance(data[0], data[1], col));
+
+  // create group array
+  int *group = (int*)malloc(row * sizeof(int));
+
+  for (int i=0; i<row; i++) {
+    float distance = INT_MAX;
+    int newGroup = -1;
+    for (int j=0; j<k; j++) {
+      float newDistance = cal_euclidean_distance(data[i], centroids[j], col);
+      if (newDistance < distance) {
+        distance = newDistance;
+        newGroup = j;
+      }
+    }
+    group[i] = newGroup;
+  }
+  for (int i=0; i<row; i++) {
+    printf("%d\n", group[i]);
+  }
+  // printf("%f\n", cal_euclidean_distance(data[0], data[1], col));
   // for (int i=0; i<row; i++) {
 
   // }
