@@ -13,6 +13,9 @@ int rank, size, num_per_proc;
 float **input_data;
 float **data;
 float **recv_data;
+int *centroidPositions;
+float **centroids;
+
 
 void print_array_2d(float **arr, int r, int c) {
   for (int i=0; i<r; i++) {
@@ -29,6 +32,37 @@ float cal_euclidean_distance(float *p1, float *p2) {
     sum_square += pow(p1[i] - p2[i], 2);
   }
   return sqrt(sum_square);
+}
+
+void random_centroids() {
+  centroidPositions  = (int*)malloc(num_clusters * sizeof(int));
+  for (int i=0; i<num_clusters; i++) {
+    centroidPositions[i] = -1;
+  }
+  srand(time(NULL));
+  int ct = 0;
+  while (ct < num_clusters) {
+    int r = rand() % row;
+    int dup = 0;
+    for (int i=0; i<=ct; i++) {
+      if (r == centroidPositions[i]) {
+        dup = 1;
+        break;
+      }
+    }
+    if (dup == 0) {
+      centroidPositions[ct] = r;
+      ct++;
+    }
+  }
+  // for (int i=0; i<num_clusters; i++) {
+  //   printf("%d\n", centroidPositions[i]);
+  // }
+  for (int i=0; i<num_clusters; i++) {
+    for (int j=0; j<col; j++) {
+      centroids[i][j] = input_data[j][centroidPositions[i]];
+    }
+  }
 }
 
 int main(int argc, char *argv[]) {
@@ -66,7 +100,7 @@ int main(int argc, char *argv[]) {
       }
       i++;
     }
-    print_array_2d(input_data, col, row);
+    // print_array_2d(input_data, col, row);
   }
   recv_data = (float**)malloc(col * sizeof(float*));
   for (int i=0; i<col; i++)
@@ -84,55 +118,24 @@ int main(int argc, char *argv[]) {
       data[i][j] = recv_data[j][i];
     }
   }
-  free(input_data);
-  free(recv_data);
 
-  printf("rank %d\n", rank);
-  print_array_2d(data, num_per_proc, col);
-  // for (int i=0; i<row/size; i++) {
-  //   printf("rank %d get %f\n", rank, recv[i]);
-  // }
-  // for (int i=0; i<25; i++) {
-  //   for (int j=0; j<col; j++)
-  //   printf("rank %d get %f\n", rank, data[i][j]);
-  // }
+  // printf("rank %d\n", rank);
+  // print_array_2d(data, num_per_proc, col);
 
-    // random centroids with unique position
-  // int *centroidPositions  = (int*)malloc(num_clusters * sizeof(int));
-  // for (int i=0; i<num_clusters; i++) {
-  //   centroidPositions[i] = -1;
-  // }
-  // srand(time(NULL));
-  // int ct = 0;
-  // while (ct < num_clusters) {
-  //   int r = rand() % row;
-  //   int dup = 0;
-  //   for (int i=0; i<=ct; i++) {
-  //     if (r == centroidPositions[i]) {
-  //       dup = 1;
-  //       break;
-  //     }
-  //   }
-  //   if (dup == 0) {
-  //     centroidPositions[ct] = r;
-  //     ct++;
-  //   }
-  // }
-  // // for (int i=0; i<k; i++) {
-  // //   printf("%d\n", centroidPositions[i]);
-  // // }
+  centroids = (float**)malloc(num_clusters * sizeof(float*));
+  for (int i=0; i<num_clusters; i++)
+    centroids[i] = (float*)malloc(col * sizeof(float));
 
-  // float **centroids = (float**)malloc(num_clusters * sizeof(float*));
-  // for (int i=0; i<num_clusters; i++)
-  //   centroids[i] = (float*)malloc(col * sizeof(float));
+  if (rank == 0) {
+    //  random centroids with unique position
+    random_centroids();
+  }
 
-  // for (int i=0; i<num_clusters; i++) {
-  //   for (int j=0; j<col; j++) {
-  //     centroids[i][j] = data[centroidPositions[i]][j];
-  //   }
-  // }
-  // // printCentroids(centroids);
-
+  for (int i=0; i<num_clusters; i++) {
+    MPI_Bcast(centroids[i], col, MPI_FLOAT, 0, MPI_COMM_WORLD);
+  }
+  printf("%d\n", rank);
+  print_array_2d(centroids, num_clusters, col);
   // // create group array
   // int *group = (int*)malloc(row * sizeof(int));
 
@@ -185,8 +188,10 @@ int main(int argc, char *argv[]) {
   // // }
 
   free(data);
-  // free(centroidPositions);
-  // free(centroids);
+  free(input_data);
+  free(recv_data);
+  free(centroidPositions);
+  free(centroids);
   // free(group);
   MPI_Finalize();
   return 0;
