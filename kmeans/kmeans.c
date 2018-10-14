@@ -4,8 +4,8 @@
 #include <time.h>
 #include <math.h>
 
-float cal_euclidean_distance(int *p1, int *p2, int col) {
-  int sum_square = 0;
+float cal_euclidean_distance(float *p1, float *p2, int col) {
+  float sum_square = 0;
   for (int i=0; i<col; i++) {
     sum_square += pow(p1[i] - p2[i], 2);
   }
@@ -21,9 +21,9 @@ int main(int argc, char *argv[]) {
   int k = atoi(argv[4]);
 
   // reading csv to array
-  int **data = (int **)malloc(row * sizeof(int *));
+  float **data = (float **)malloc(row * sizeof(float *));
   for (int i=0; i<row; i++)
-    data[i] = (int *)malloc(col * sizeof(int));
+    data[i] = (float *)malloc(col * sizeof(float));
 
   char line[1024];
   int i = 0;
@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
   }
   for (int i = 0; i<row; i++) {
     for (int j = 0; j<col; j++) {
-      printf("%d ", data[i][j]);
+      printf("%f ", data[i][j]);
     }
     printf("\n");
   }
