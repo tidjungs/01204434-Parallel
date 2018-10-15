@@ -85,22 +85,7 @@ void read_data_from_file() {
   }
 }
 
-int main(int argc, char *argv[]) {
-  MPI_Init(&argc, &argv);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-  sprintf(filename, "./%s", argv[1]);
-  row = atoi(argv[2]);
-  col = atoi(argv[3]);
-  num_clusters = atoi(argv[4]);
-  iter = atoi(argv[5]);
-  num_per_proc = row/size;
-  input_data = (float**)malloc(col * sizeof(float*));
-
-  if (rank == 0) {
-    read_data_from_file();
-  }
+void scatter_data_to_all_process() {
   recv_data = (float**)malloc(col * sizeof(float*));
   for (int i=0; i<col; i++)
     recv_data[i] = (float*)malloc(num_per_proc * sizeof(float));
@@ -117,6 +102,25 @@ int main(int argc, char *argv[]) {
       data[i][j] = recv_data[j][i];
     }
   }
+}
+
+int main(int argc, char *argv[]) {
+  MPI_Init(&argc, &argv);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  sprintf(filename, "./%s", argv[1]);
+  row = atoi(argv[2]);
+  col = atoi(argv[3]);
+  num_clusters = atoi(argv[4]);
+  iter = atoi(argv[5]);
+  num_per_proc = row/size;
+  input_data = (float**)malloc(col * sizeof(float*));
+
+  if (rank == 0) {
+    read_data_from_file();
+  }
+  scatter_data_to_all_process();
 
   // printf("rank %d\n", rank);
   // print_array_2d(data, num_per_proc, col);
@@ -143,6 +147,12 @@ int main(int argc, char *argv[]) {
   local_count = (int*)malloc(num_clusters * sizeof(int));
   // kmeans
   while(iter > 0) {
+    for (int i=0; i<num_clusters; i++) {
+      for (int j=0; j<col; j++) {
+        local_sum[i][j] = 0;
+      }
+      local_count[i] = 0;
+    }
     for (int i=0; i<num_per_proc; i++) {
       float distance = INT_MAX;
       int newGroup = -1;
