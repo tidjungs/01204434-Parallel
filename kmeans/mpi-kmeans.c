@@ -135,7 +135,6 @@ int main(int argc, char *argv[]) {
   for (int i=0; i<num_clusters; i++) {
     MPI_Bcast(centroids[i], col, MPI_FLOAT, 0, MPI_COMM_WORLD);
   }
-  printf("%d\n", rank);
   // print_array_2d(centroids, num_clusters, col);
   // // create group array
   int *group = (int*)malloc(num_per_proc * sizeof(int));
@@ -158,10 +157,11 @@ int main(int argc, char *argv[]) {
     }
     group[i] = newGroup;
   }
-  for (int i=0; i<num_per_proc; i++) {
-    printf("%d\n", group[i]);
-  }
-
+  // printf("rank %d\n", rank);
+  // for (int i=0; i<num_per_proc; i++) {
+  //   printf("%d ", group[i]);
+  // }
+  // printf("\n");
     // calculate new centroid
     for (int i=0; i<num_clusters; i++) {
       for (int j=0; j<col; j++) {
@@ -187,9 +187,18 @@ int main(int argc, char *argv[]) {
       }
       MPI_Allreduce(&local_count[i], &local_count[i], 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     }
-
     printf("rank %d\n", rank);
-    print_array_2d(local_sum, num_clusters, col);
+    for (int i=0; i<num_clusters; i++) {
+      printf("%d ", local_count[i]);
+    }
+    printf("\n");
+    for (int i=0; i<num_clusters; i++) {
+      for (int j=0; j<col; j++) {
+        centroids[i][j] = local_sum[i][j] / local_count[i];
+      }
+    }
+    printf("rank %d\n", rank);
+    print_array_2d(centroids, num_clusters, col);
     // iter--;
   // }
   // printCentroids(centroids);
