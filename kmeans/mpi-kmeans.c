@@ -18,6 +18,8 @@ float **centroids;
 float **local_sum;
 int *local_count;
 
+char filename[50];
+
 void print_array_2d(float **arr, int r, int c) {
   for (int i=0; i<r; i++) {
     for (int j=0; j<c; j++) {
@@ -56,12 +58,29 @@ void random_centroids() {
       ct++;
     }
   }
-  // for (int i=0; i<num_clusters; i++) {
-  //   printf("%d\n", centroidPositions[i]);
-  // }
   for (int i=0; i<num_clusters; i++) {
     for (int j=0; j<col; j++) {
       centroids[i][j] = input_data[j][centroidPositions[i]];
+    }
+  }
+}
+
+void read_data_from_file() {
+ for (int i=0; i<col; i++)
+    input_data[i] = (float*)malloc(row * sizeof(float));
+  char line[1024];
+  FILE* stream = fopen(filename, "r");
+  for(int i=0; i<row; i++)
+  {
+    fgets(line, 1024, stream);
+    char *pch;
+    pch = strtok(line,",");
+    int j = 0;
+    while(pch != NULL)
+    {
+      input_data[j][i] = atoi(pch);
+      pch = strtok(NULL, ",");
+      j++;
     }
   }
 }
@@ -71,6 +90,7 @@ int main(int argc, char *argv[]) {
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+  sprintf(filename, "./%s", argv[1]);
   row = atoi(argv[2]);
   col = atoi(argv[3]);
   num_clusters = atoi(argv[4]);
@@ -79,29 +99,7 @@ int main(int argc, char *argv[]) {
   input_data = (float**)malloc(col * sizeof(float*));
 
   if (rank == 0) {
-    char filename[50];
-    sprintf(filename, "./%s", argv[1]);
-
-    for (int i=0; i<col; i++)
-      input_data[i] = (float*)malloc(row * sizeof(float));
-
-    char line[1024];
-    int i = 0;
-    FILE* stream = fopen(filename, "r");
-    while(fgets(line, 1024, stream))
-    {
-      char *pch;
-      pch = strtok(line,",");
-      int j = 0;
-      while(pch != NULL)
-      {
-        input_data[j][i] = atoi(pch);
-        pch = strtok(NULL, ",");
-        j++;
-      }
-      i++;
-    }
-    // print_array_2d(input_data, col, row);
+    read_data_from_file();
   }
   recv_data = (float**)malloc(col * sizeof(float*));
   for (int i=0; i<col; i++)
@@ -144,24 +142,20 @@ int main(int argc, char *argv[]) {
   }
   local_count = (int*)malloc(num_clusters * sizeof(int));
   // kmeans
-  // while(iter > 0) {
-  for (int i=0; i<num_per_proc; i++) {
-    float distance = INT_MAX;
-    int newGroup = -1;
-    for (int j=0; j<num_clusters; j++) {
-      float newDistance = cal_euclidean_distance(data[i], centroids[j]);
-      if (newDistance < distance) {
-        distance = newDistance;
-        newGroup = j;
+  while(iter > 0) {
+    for (int i=0; i<num_per_proc; i++) {
+      float distance = INT_MAX;
+      int newGroup = -1;
+      for (int j=0; j<num_clusters; j++) {
+        float newDistance = cal_euclidean_distance(data[i], centroids[j]);
+        if (newDistance < distance) {
+          distance = newDistance;
+          newGroup = j;
+        }
       }
+      group[i] = newGroup;
     }
-    group[i] = newGroup;
-  }
-  // printf("rank %d\n", rank);
-  // for (int i=0; i<num_per_proc; i++) {
-  //   printf("%d ", group[i]);
-  // }
-  // printf("\n");
+
     // calculate new centroid
     for (int i=0; i<num_clusters; i++) {
       for (int j=0; j<col; j++) {
@@ -178,8 +172,6 @@ int main(int argc, char *argv[]) {
         }
       }
     }
-    // printf("rank %d\n", rank);
-    // print_array_2d(local_sum, num_clusters, col);
 
     for (int i=0; i<num_clusters; i++) {
       for (int j=0; j<col; j++) {
@@ -187,20 +179,22 @@ int main(int argc, char *argv[]) {
       }
       MPI_Allreduce(&local_count[i], &local_count[i], 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     }
-    printf("rank %d\n", rank);
-    for (int i=0; i<num_clusters; i++) {
-      printf("%d ", local_count[i]);
-    }
-    printf("\n");
+    // printf("rank %d\n", rank);
+    // for (int i=0; i<num_clusters; i++) {
+    //   printf("%d ", local_count[i]);
+    // }
+    // printf("\n");
     for (int i=0; i<num_clusters; i++) {
       for (int j=0; j<col; j++) {
         centroids[i][j] = local_sum[i][j] / local_count[i];
       }
     }
-    printf("rank %d\n", rank);
-    print_array_2d(centroids, num_clusters, col);
-    // iter--;
-  // }
+
+    iter--;
+  }
+  printf("rank %d\n", rank);
+  print_array_2d(centroids, num_clusters, col);
+
   // printCentroids(centroids);
 
   // // printf("%f\n", cal_euclidean_distance(data[0], data[1], col));
