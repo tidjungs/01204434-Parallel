@@ -15,6 +15,7 @@ float **data;
 float **recv_data;
 int *centroidPositions;
 float **centroids;
+int *group;
 float **local_sum;
 int *local_count;
 
@@ -104,6 +105,74 @@ void scatter_data_to_all_process() {
   }
 }
 
+void calculate_local_sum_and_local_count() {
+  for (int i=0; i<num_clusters; i++) {
+    for (int j=0; j<num_per_proc; j++) {
+      if (group[j] == i) {
+        for (int k=0; k<col; k++) {
+          local_sum[i][k] += data[j][k];
+        }
+        local_count[i]++;
+      }
+    }
+  }
+}
+
+void clear_local_sum_and_local_count() {
+  for (int i=0; i<num_clusters; i++) {
+    for (int j=0; j<col; j++) {
+      local_sum[i][j] = 0;
+    }
+    local_count[i] = 0;
+  }
+}
+
+void calculate_global_centroids() {
+  for (int i=0; i<num_clusters; i++) {
+    for (int j=0; j<col; j++) {
+      MPI_Allreduce(&local_sum[i][j], &local_sum[i][j], 1, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+    }
+    MPI_Allreduce(&local_count[i], &local_count[i], 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  }
+
+  for (int i=0; i<num_clusters; i++) {
+    for (int j=0; j<col; j++) {
+      centroids[i][j] = local_sum[i][j] / local_count[i];
+    }
+  }
+}
+
+void kmeans() {
+  // allocate memory for group, local_sum, local_count
+  group = (int*)malloc(num_per_proc * sizeof(int));
+  local_sum = (float**)malloc(num_clusters * sizeof(float*));
+  for (int i=0; i<num_clusters; i++) {
+    local_sum[i] = (float*)malloc(col * sizeof(float));
+  }
+  local_count = (int*)malloc(num_clusters * sizeof(int));
+
+  while(iter > 0) {
+    clear_local_sum_and_local_count();
+
+    for (int i=0; i<num_per_proc; i++) {
+      float distance = INT_MAX;
+      int newGroup = -1;
+      for (int j=0; j<num_clusters; j++) {
+        float newDistance = cal_euclidean_distance(data[i], centroids[j]);
+        if (newDistance < distance) {
+          distance = newDistance;
+          newGroup = j;
+        }
+      }
+      group[i] = newGroup;
+    }
+
+    calculate_local_sum_and_local_count();
+    calculate_global_centroids();
+    iter--;
+  }
+}
+
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -122,95 +191,26 @@ int main(int argc, char *argv[]) {
   }
   scatter_data_to_all_process();
 
-  // printf("rank %d\n", rank);
-  // print_array_2d(data, num_per_proc, col);
 
+  // allocate centroids memory
   centroids = (float**)malloc(num_clusters * sizeof(float*));
   for (int i=0; i<num_clusters; i++)
     centroids[i] = (float*)malloc(col * sizeof(float));
 
   if (rank == 0) {
-    //  random centroids with unique position
     random_centroids();
   }
 
+  // broadcast centroids to all process
   for (int i=0; i<num_clusters; i++) {
     MPI_Bcast(centroids[i], col, MPI_FLOAT, 0, MPI_COMM_WORLD);
   }
-  // print_array_2d(centroids, num_clusters, col);
-  // // create group array
-  int *group = (int*)malloc(num_per_proc * sizeof(int));
-  local_sum = (float**)malloc(num_clusters * sizeof(float*));
-  for (int i=0; i<num_clusters; i++) {
-    local_sum[i] = (float*)malloc(col * sizeof(float));
+
+  kmeans();
+
+  if (rank == 0) {
+    print_array_2d(centroids, num_clusters, col);
   }
-  local_count = (int*)malloc(num_clusters * sizeof(int));
-  // kmeans
-  while(iter > 0) {
-    for (int i=0; i<num_clusters; i++) {
-      for (int j=0; j<col; j++) {
-        local_sum[i][j] = 0;
-      }
-      local_count[i] = 0;
-    }
-    for (int i=0; i<num_per_proc; i++) {
-      float distance = INT_MAX;
-      int newGroup = -1;
-      for (int j=0; j<num_clusters; j++) {
-        float newDistance = cal_euclidean_distance(data[i], centroids[j]);
-        if (newDistance < distance) {
-          distance = newDistance;
-          newGroup = j;
-        }
-      }
-      group[i] = newGroup;
-    }
-
-    // calculate new centroid
-    for (int i=0; i<num_clusters; i++) {
-      for (int j=0; j<col; j++) {
-        centroids[i][j] = 0;
-      }
-    }
-    for (int i=0; i<num_clusters; i++) {
-      for (int j=0; j<num_per_proc; j++) {
-        if (group[j] == i) {
-          for (int k=0; k<col; k++) {
-            local_sum[i][k] += data[j][k];
-          }
-          local_count[i]++;
-        }
-      }
-    }
-
-    for (int i=0; i<num_clusters; i++) {
-      for (int j=0; j<col; j++) {
-        MPI_Allreduce(&local_sum[i][j], &local_sum[i][j], 1, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-      }
-      MPI_Allreduce(&local_count[i], &local_count[i], 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-    }
-    // printf("rank %d\n", rank);
-    // for (int i=0; i<num_clusters; i++) {
-    //   printf("%d ", local_count[i]);
-    // }
-    // printf("\n");
-    for (int i=0; i<num_clusters; i++) {
-      for (int j=0; j<col; j++) {
-        centroids[i][j] = local_sum[i][j] / local_count[i];
-      }
-    }
-
-    iter--;
-  }
-  printf("rank %d\n", rank);
-  print_array_2d(centroids, num_clusters, col);
-
-  // printCentroids(centroids);
-
-  // // printf("%f\n", cal_euclidean_distance(data[0], data[1], col));
-  // // for (int i=0; i<row; i++) {
-
-  // // }
 
   free(data);
   free(input_data);
