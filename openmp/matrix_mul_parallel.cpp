@@ -20,13 +20,17 @@ int main() {
 
   double start_t = omp_get_wtime();
 
-  for (int i=0; i<N; i++) {
-    for (int j=0; j<N; j++) {
-      int num = 0;
-      for (int k=0; k < N; k++) {
-        num += A[i][k] * B[k][j];
+  #pragma omp parallel num_threads(4)
+  {
+    #pragma omp for
+    for (int i=0; i<N; i++) {
+      for (int j=0; j<N; j++) {
+        int num = 0;
+        for (int k=0; k < N; k++) {
+          num += A[i][k] * B[k][j];
+        }
+        C[i][j] = num;
       }
-      C[i][j] = num;
     }
   }
 
