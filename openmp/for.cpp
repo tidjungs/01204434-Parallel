@@ -11,11 +11,9 @@ int main()
     double start_t = omp_get_wtime();
     #pragma omp parallel num_threads(4)
     {
-        #pragma ompfor
-        {
-            for (i=0; i<10000000; i++) {
-                a[i] = sin(i);
-            }
+        #pragma omp for
+        for (i=0; i<10000000; i++) {
+            a[i] = sin(i);
         }
     }
     double end_t = omp_get_wtime();
